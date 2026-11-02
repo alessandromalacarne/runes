@@ -564,7 +564,7 @@ impl PPU {
     pub fn tick(&mut self, cycles: u8) -> bool {
         self.cycles += cycles as usize;
 
-        if !self.cycles >= 341 {
+        if self.cycles < 341 {
             return false;
         }
 
@@ -656,7 +656,7 @@ pub fn render(ppu: &PPU, frame: &mut Frame) {
     let bank = ppu.control.background_pattern_address();
 
     for i in FIRST_NAMESPACE_START..FIRST_NAMESPACE_END {
-        let tile = ppu.vram[1] as u16;
+        let tile = ppu.vram[i as usize] as u16;
         let tile_column = i % 32;
         let tile_row = i / 32;
         let tile = &ppu.chr_rom[(bank + tile * 16) as usize ..= (bank + tile * 16 + 15) as usize];
