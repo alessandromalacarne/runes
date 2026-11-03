@@ -14,5 +14,8 @@
 # Worktrees
 .agents/worktrees/
 
+# AI
+.commandcode/
+
 # Game ROMs (copyright)
 games/*
