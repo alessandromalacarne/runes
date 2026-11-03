@@ -10,3 +10,9 @@
 
 /target
 /result
+
+# Worktrees
+.agents/worktrees/
+
+# Game ROMs (copyright)
+games/*
