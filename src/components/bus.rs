@@ -1,4 +1,6 @@
 use super::cartridges::ROM;
+use super::joypads::Joypad;
+use super::joypads::JoypadButton;
 use super::ppu::PPU;
 use super::ram::RAM;
 
@@ -11,14 +13,16 @@ pub struct BUS<'call> {
     ram: RAM,
     prg_rom: Vec<u8>,
     ppu: PPU,
+    joypad: Joypad,
+    joypad2: Joypad,
     cycles: usize,
-    gameloop_callback: Box<dyn FnMut(&PPU) + 'call>
+    gameloop_callback: Box<dyn FnMut(&PPU, &mut Joypad) + 'call>,
 }
 
 impl<'a> BUS<'a> {
     pub fn new<'call, F>(rom: ROM, gameloop_callback: F) -> BUS<'call>
     where
-        F: FnMut(&PPU) + 'call
+        F: FnMut(&PPU, &mut Joypad) + 'call,
     {
         let ppu = PPU::new(rom.chr_rom, rom.screen_mirroring);
 
@@ -26,8 +30,10 @@ impl<'a> BUS<'a> {
             ram: RAM::new(),
             prg_rom: rom.prg_rom,
             ppu,
+            joypad: Joypad::new(),
+            joypad2: Joypad::new(),
             cycles: 0,
-            gameloop_callback: Box::from(gameloop_callback)
+            gameloop_callback: Box::from(gameloop_callback),
         }
     }
 
@@ -38,9 +44,7 @@ impl<'a> BUS<'a> {
                 self.ram.read(adjusted_address)
             }
 
-            PPU_REGISTERS_START | 0x2001 | 0x2003 | 0x2005 | 0x2006 | 0x4014 => {
-                0
-            }
+            PPU_REGISTERS_START | 0x2001 | 0x2003 | 0x2005 | 0x2006 | 0x4014 => 0,
 
             0x2002 => self.ppu.read_status(),
 
@@ -53,15 +57,9 @@ impl<'a> BUS<'a> {
                 0
             }
 
-            0x4016 => {
-                // ignore joypad 1;
-                0
-            }
+            0x4016 => self.joypad.read(),
 
-            0x4017 => {
-                // ignore joypad 2
-                0
-            }
+            0x4017 => self.joypad2.read(),
 
             0x2008..=PPU_REGISTERS_END => {
                 let adjusted_address = address & 0b00100000_00000111;
@@ -105,11 +103,12 @@ impl<'a> BUS<'a> {
             }
 
             0x4016 => {
-                // ignore joypad 1;
+                self.joypad.write(data);
+                self.joypad2.write(data);
             }
 
             0x4017 => {
-                // ignore joypad 2
+                self.joypad2.write(data);
             }
 
             0x4014 => {
@@ -168,11 +167,55 @@ impl<'a> BUS<'a> {
         let new_frame = self.ppu.tick(cycles * 3);
 
         if new_frame {
-            (self.gameloop_callback)(&self.ppu);
+            (self.gameloop_callback)(&self.ppu, &mut self.joypad);
         }
     }
 
     pub fn pool_nmi_status(&mut self) -> Option<u8> {
         self.ppu.pool_nmi_status()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::components::cartridges::test::test_rom;
+    use std::cell::Cell;
+    use std::rc::Rc;
+
+    #[test]
+    fn memory_read_0x4016_returns_joypad_state() {
+        let called = Rc::new(Cell::new(false));
+        let c = called.clone();
+        let mut bus = BUS::new(test_rom(), move |_ppu: &PPU, _joypad: &mut Joypad| {
+            c.set(true);
+        });
+        bus.joypad.set_button_pressed_status(JoypadButton::A, true);
+        bus.joypad.write(0);
+        assert_eq!(bus.memory_read(0x4016), 1);
+    }
+
+    #[test]
+    fn memory_write_0x4016_strobes_joypad() {
+        let mut bus = BUS::new(test_rom(), |_ppu: &PPU, _joypad: &mut Joypad| {});
+        bus.joypad.set_button_pressed_status(JoypadButton::A, true);
+        bus.memory_write(0x4016, 0);
+        assert_eq!(bus.memory_read(0x4016), 1);
+    }
+
+    #[test]
+    fn tick_invokes_callback_on_frame() {
+        let called = Rc::new(Cell::new(false));
+        let c = called.clone();
+        let mut bus = BUS::new(test_rom(), move |_ppu: &PPU, _joypad: &mut Joypad| {
+            c.set(true);
+        });
+        for _ in 0..200000 {
+            bus.tick(1);
+            if called.get() {
+                break;
+            }
+        }
+        assert!(called.get());
     }
 }

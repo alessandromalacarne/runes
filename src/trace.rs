@@ -17,7 +17,7 @@ pub fn trace(cpu: &mut CPU) -> String {
         AddressingMode::Immediate | AddressingMode::NoneAddressing => (0, 0),
 
         _ => {
-            let address = cpu.get_absolute_address(&opcode.mode, old_pc + 1);
+            let (address, _) = cpu.get_absolute_address(&opcode.mode, old_pc + 1);
             (address, cpu.memory_read(address))
         }
     };
@@ -155,14 +155,17 @@ pub fn trace(cpu: &mut CPU) -> String {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::components::ppu::PPU;
     use crate::components::bus::BUS;
     use crate::components::cartridges::test::test_rom;
+    use crate::components::ppu::PPU;
 
     #[test]
 
     fn test_format_trace() {
-        let mut bus = BUS::new(test_rom(), |_ppu: &PPU| {});
+        let mut bus = BUS::new(
+            test_rom(),
+            |_ppu: &PPU, _joypad: &mut crate::components::joypads::Joypad| {},
+        );
         bus.memory_write(100, 0xa2);
         bus.memory_write(101, 0x01);
         bus.memory_write(102, 0xca);
@@ -196,7 +199,10 @@ mod test {
 
     #[test]
     fn test_format_memory_acess() {
-        let mut bus = BUS::new(test_rom(), |_ppu: &PPU| {});
+        let mut bus = BUS::new(
+            test_rom(),
+            |_ppu: &PPU, _joypad: &mut crate::components::joypads::Joypad| {},
+        );
         // ORA ($33), Y
         bus.memory_write(100, 0x11);
         bus.memory_write(101, 0x33);

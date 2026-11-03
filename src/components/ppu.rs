@@ -113,7 +113,7 @@ impl ControlRegister {
             1 => 0x2400,
             2 => 0x2800,
             3 => 0x2c00,
-            _ => panic!("Invalid nametable address")
+            _ => panic!("Invalid nametable address"),
         }
     }
 
@@ -254,7 +254,7 @@ bitflags! {
 enum Color {
     Red,
     Green,
-    Blue
+    Blue,
 }
 
 impl MaskRegister {
@@ -308,7 +308,7 @@ impl MaskRegister {
 struct ScrollRegister {
     scroll_x: u8,
     scroll_y: u8,
-    latch: bool
+    latch: bool,
 }
 
 impl ScrollRegister {
@@ -316,7 +316,7 @@ impl ScrollRegister {
         ScrollRegister {
             scroll_x: 0,
             scroll_y: 0,
-            latch: false
+            latch: false,
         }
     }
 
@@ -633,22 +633,26 @@ fn background_pallete(ppu: &PPU, tile_column: usize, tile_row: usize) -> [u8; 4]
         (1, 0) => (attribute_byte >> 2) & 0b11,
         (0, 1) => (attribute_byte >> 4) & 0b11,
         (1, 1) => (attribute_byte >> 6) & 0b11,
-        (_, _) => panic!("Don't expected")
+        (_, _) => panic!("Don't expected"),
     };
 
     let pallete_start = 1 + (pallete_index as usize) * 4;
 
-    [ppu.pallete_table[0], ppu.pallete_table[pallete_start],
-    ppu.pallete_table[pallete_start + 1], ppu.pallete_table[pallete_start + 2]]
+    [
+        ppu.pallete_table[0],
+        ppu.pallete_table[pallete_start],
+        ppu.pallete_table[pallete_start + 1],
+        ppu.pallete_table[pallete_start + 2],
+    ]
 }
 
-fn sprite_pallete(ppu: &PPU, pallete_index: u8) -> [u8;4] {
+fn sprite_pallete(ppu: &PPU, pallete_index: u8) -> [u8; 4] {
     let start = 0x11 + (pallete_index * 4) as usize;
     [
         0,
         ppu.pallete_table[start],
         ppu.pallete_table[start + 1],
-        ppu.pallete_table[start + 2]
+        ppu.pallete_table[start + 2],
     ]
 }
 
@@ -659,7 +663,7 @@ pub fn render(ppu: &PPU, frame: &mut Frame) {
         let tile = ppu.vram[i as usize] as u16;
         let tile_column = i % 32;
         let tile_row = i / 32;
-        let tile = &ppu.chr_rom[(bank + tile * 16) as usize ..= (bank + tile * 16 + 15) as usize];
+        let tile = &ppu.chr_rom[(bank + tile * 16) as usize..=(bank + tile * 16 + 15) as usize];
         let pallete = background_pallete(ppu, tile_column as usize, tile_row as usize);
 
         for y in 0..=7 {
@@ -676,7 +680,7 @@ pub fn render(ppu: &PPU, frame: &mut Frame) {
                     1 => SYSTEM_PALLETE[pallete[1] as usize],
                     2 => SYSTEM_PALLETE[pallete[2] as usize],
                     3 => SYSTEM_PALLETE[pallete[3] as usize],
-                    _ => panic!("Invalid RGB")
+                    _ => panic!("Invalid RGB"),
                 };
 
                 let y = y as u16;
@@ -710,7 +714,8 @@ pub fn render(ppu: &PPU, frame: &mut Frame) {
         let sprite_pallete = sprite_pallete(ppu, pallete_index);
         let bank = ppu.control.sprite_pattern_address();
 
-        let tile = &ppu.chr_rom[(bank + tile_index * 16) as usize ..= (bank + tile_index * 16 + 15) as usize];
+        let tile = &ppu.chr_rom
+            [(bank + tile_index * 16) as usize..=(bank + tile_index * 16 + 15) as usize];
 
         for y in 0..=7 {
             let mut upper = tile[y];
@@ -733,7 +738,7 @@ pub fn render(ppu: &PPU, frame: &mut Frame) {
                     (false, false) => frame.set_pixel(tile_x as usize + x, tile_y + y, rgb),
                     (true, false) => frame.set_pixel(tile_x as usize + 7 - x, tile_y + y, rgb),
                     (false, true) => frame.set_pixel(tile_x as usize + x, tile_y + 7 - y, rgb),
-                    (true, true) => frame.set_pixel(tile_x as usize+ 7 - x, tile_y + 7 - y, rgb)
+                    (true, true) => frame.set_pixel(tile_x as usize + 7 - x, tile_y + 7 - y, rgb),
                 }
             }
         }

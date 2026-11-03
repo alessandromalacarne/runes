@@ -50,21 +50,21 @@ pub enum AddressingMode {
 
 #[derive(PartialEq, Eq)]
 pub enum InterruptType {
-    NMI
+    NMI,
 }
 
 pub struct Interrupt {
     pub interrupt_type: InterruptType,
     pub vector_address: u16,
     pub binary_flag_mask: u8,
-    pub cpu_cycles: u8
+    pub cpu_cycles: u8,
 }
 
 pub const NMI: Interrupt = Interrupt {
     interrupt_type: InterruptType::NMI,
     vector_address: 0xFFFA,
     binary_flag_mask: 0b00100000,
-    cpu_cycles: 2
+    cpu_cycles: 2,
 };
 
 pub struct CPU<'bus> {
@@ -264,7 +264,6 @@ impl<'a> CPU<'a> {
 
             self.register_pc = jump_address;
         }
-
     }
 
     pub fn update_pc(&mut self, opcode: &&OpCode, pc_state: u16) {
@@ -303,6 +302,8 @@ impl<'a> CPU<'a> {
                 self.interrupt(NMI);
             }
 
+            callback(self);
+
             let code = self.memory_read(self.register_pc);
             self.register_pc += 1;
 
@@ -310,8 +311,6 @@ impl<'a> CPU<'a> {
 
             if program_ends {
                 break;
-            } else {
-                callback(self);
             }
         }
     }

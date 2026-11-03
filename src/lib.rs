@@ -1,13 +1,14 @@
-use components::cpu::CPU;
-use components::cartridges::ROM;
 use components::bus::BUS;
-use components::ppu::PPU;
-use components::ppu::Frame;
+use components::cartridges::ROM;
+use components::cpu::CPU;
+use components::joypads::JoypadButton;
 use components::ppu::render;
+use components::ppu::Frame;
+use components::ppu::PPU;
 use sdl2::{
     event::Event,
     keyboard::Keycode,
-    pixels::{Color, PixelFormatEnum}, EventPump,
+    pixels::{Color, PixelFormatEnum},
 };
 
 pub mod components;
@@ -45,40 +46,17 @@ fn read_screen_state(cpu: &mut CPU, frame: &mut [u8; 32 * 3 * 32]) -> bool {
     update
 }
 
-fn handle_user_input(cpu: &mut CPU, event_pump: &mut EventPump) {
-    for event in event_pump.poll_iter() {
-        match event {
-            Event::Quit { .. }
-            | Event::KeyDown {
-                keycode: Some(Keycode::Escape),
-                ..
-            } => std::process::exit(0),
-            Event::KeyDown {
-                keycode: Some(Keycode::W),
-                ..
-            } => {
-                cpu.memory_write(0xff, 0x77);
-            }
-            Event::KeyDown {
-                keycode: Some(Keycode::S),
-                ..
-            } => {
-                cpu.memory_write(0xff, 0x73);
-            }
-            Event::KeyDown {
-                keycode: Some(Keycode::A),
-                ..
-            } => {
-                cpu.memory_write(0xff, 0x61);
-            }
-            Event::KeyDown {
-                keycode: Some(Keycode::D),
-                ..
-            } => {
-                cpu.memory_write(0xff, 0x64);
-            }
-            _ => {}
-        }
+fn key_to_button(key: Keycode) -> Option<JoypadButton> {
+    match key {
+        Keycode::Z => Some(JoypadButton::A),
+        Keycode::X => Some(JoypadButton::B),
+        Keycode::Return => Some(JoypadButton::START),
+        Keycode::Backspace => Some(JoypadButton::SELECT),
+        Keycode::Up | Keycode::W => Some(JoypadButton::UP),
+        Keycode::Down | Keycode::S => Some(JoypadButton::DOWN),
+        Keycode::Left | Keycode::A => Some(JoypadButton::LEFT),
+        Keycode::Right | Keycode::D => Some(JoypadButton::RIGHT),
+        _ => None,
     }
 }
 
@@ -105,23 +83,46 @@ pub fn start(game: &str) {
 
     let mut frame = Frame::new();
 
-    let bus = BUS::new(rom, move |ppu: &PPU| {
-        render(ppu, &mut frame);
+    let bus = BUS::new(
+        rom,
+        move |ppu: &PPU, joypad: &mut components::joypads::Joypad| {
+            render(ppu, &mut frame);
 
-        texture.update(None, frame.get_data(), 256 * 3).unwrap();
-        canvas.copy(&texture, None, None).unwrap();
-        canvas.present();
+            texture.update(None, frame.get_data(), 256 * 3).unwrap();
+            canvas.copy(&texture, None, None).unwrap();
+            canvas.present();
 
-        for event in event_pump.poll_iter() {
-            match event {
-                Event::Quit { .. } | Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-                    std::process::exit(0);
+            for event in event_pump.poll_iter() {
+                match event {
+                    Event::Quit { .. }
+                    | Event::KeyDown {
+                        keycode: Some(Keycode::Escape),
+                        ..
+                    } => {
+                        std::process::exit(0);
+                    }
+
+                    Event::KeyDown {
+                        keycode: Some(key), ..
+                    } => {
+                        if let Some(button) = key_to_button(key) {
+                            joypad.set_button_pressed_status(button, true);
+                        }
+                    }
+
+                    Event::KeyUp {
+                        keycode: Some(key), ..
+                    } => {
+                        if let Some(button) = key_to_button(key) {
+                            joypad.set_button_pressed_status(button, false);
+                        }
+                    }
+
+                    _ => {}
                 }
-
-                _ => {}
             }
-        }
-    });
+        },
+    );
 
     let mut cpu = CPU::new(bus);
     cpu.reset();
